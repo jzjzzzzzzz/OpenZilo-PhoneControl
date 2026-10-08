@@ -6,6 +6,7 @@
 
 A macOS-to-iPhone control bridge for **ComBodied AI**, built on the public OpenZilo Python SDK.
 
+[![CI](https://github.com/jzjzzzzzzz/OpenZilo-PhoneControl/actions/workflows/ci.yml/badge.svg)](https://github.com/jzjzzzzzzz/OpenZilo-PhoneControl/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Platform](https://img.shields.io/badge/Control-macOS%20%2B%20iPhone-555555)
 ![Models](https://img.shields.io/badge/RNN-bring%20your%20own-013243)

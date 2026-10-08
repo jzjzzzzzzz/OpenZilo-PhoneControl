@@ -7,6 +7,7 @@ permissions:
   contents: read
 jobs:
   validate:
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -17,16 +18,16 @@ jobs:
             python: '3.13'
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: jzjzzzzzzz/combodied-motion-lab
           ref: 839ecc0bc89fd560e29eb6cc1b41f17afe5a51d7
           path: .motion-lab
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
           cache: pip
