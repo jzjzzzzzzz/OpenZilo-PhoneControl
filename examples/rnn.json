@@ -1,0 +1,8 @@
+{
+  "mapping": {"up": "next", "down": "previous"},
+  "keys": {"next": "SPACE", "previous": null},
+  "rnn_confidence": 0.92,
+  "rnn_margin": 0.12,
+  "rnn_confirmations": 2,
+  "rnn_idle_confidence": 0.8
+}

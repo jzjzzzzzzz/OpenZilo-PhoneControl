@@ -1,0 +1,4 @@
+{
+  "mapping": {"key_double_press": "next", "rotate_front": "next", "rotate_back": "previous"},
+  "keys": {"next": "F13", "previous": "F14"}
+}

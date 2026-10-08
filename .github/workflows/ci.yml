@@ -1,0 +1,46 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+          - os: macos-latest
+            python: '3.13'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: jzjzzzzzzz/combodied-motion-lab
+          ref: 839ecc0bc89fd560e29eb6cc1b41f17afe5a51d7
+          path: .motion-lab
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install public dependencies
+        run: python -m pip install -e '.[rnn]'
+      - name: Check dependencies
+        run: python -m pip check
+      - name: Audit publication boundary
+        run: python scripts/check_release.py --tracked
+      - name: Test with synthetic model artifacts
+        env:
+          COMBODIED_MOTION_LAB_PATH: ${{ github.workspace }}/.motion-lab
+        run: python -m unittest discover -s tests -v
+      - name: Offline replay and shell syntax
+        run: |
+          ./ringphone replay
+          /bin/sh -n ringphone setup.sh

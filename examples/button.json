@@ -1,0 +1,4 @@
+{
+  "mapping": {"key_double_press": "next"},
+  "keys": {"next": "SPACE", "previous": null}
+}

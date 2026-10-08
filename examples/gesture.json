@@ -1,0 +1,5 @@
+{
+  "mapping": {"rotate_front": "next", "wave": "next", "rotate_back": "previous"},
+  "keys": {"next": "SPACE", "previous": null},
+  "cooldown_s": 0.8
+}

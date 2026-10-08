@@ -1,0 +1,8 @@
+{"at_s":0.1,"event":"key_double_press","timestamp_ms":100}
+{"at_s":2.0,"event":"key_double_press","timestamp_ms":2000}
+{"at_s":2.1,"event":"key_double_press","timestamp_ms":2000}
+{"at_s":2.2,"event":"double_tap","timestamp_ms":2200}
+{"at_s":2.3,"event":"key_double_press","timestamp_ms":2300}
+{"at_s":3.0,"event":"key_single_press","timestamp_ms":3000}
+{"at_s":4.0,"event":"key_double_press","timestamp_ms":4000,"age_s":1.0}
+{"at_s":5.0,"event":"key_double_press","timestamp_ms":5000}

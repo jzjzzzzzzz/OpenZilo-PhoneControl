@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OpenZilo-PhoneControl"
+version = "1.0.0"
+description = "Local wearable-to-iPhone interaction through macOS Switch Control for ComBodied AI."
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["combodied-ai", "openzilo", "gesture-recognition", "iphone", "accessibility"]
+dependencies = [
+  "bleak>=3.0,<4",
+  "OpenZilo @ git+https://github.com/ziloai/OpenZilo.git@e9a861dd5c82a154fba0f1bafb628cd04fbd9555",
+]
+
+[project.optional-dependencies]
+rnn = ["numpy>=1.26,<3"]
+
+[project.scripts]
+ringphone = "ring_iphone.cli:main"
+
+[project.urls]
+Repository = "https://github.com/jzjzzzzzzz/OpenZilo-PhoneControl"
+"Motion training" = "https://github.com/jzjzzzzzzz/combodied-motion-lab"
+"Hardware SDK" = "https://github.com/ziloai/OpenZilo"
+
+[tool.setuptools]
+packages = ["ring_iphone"]
