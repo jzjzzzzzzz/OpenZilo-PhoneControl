@@ -152,3 +152,63 @@ class AdapterTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RuntimeError):
             await output.perform('previous', guard=lambda: False)
         self.assertEqual(api.calls, [])
+
+class HTTPInputValidationTests(unittest.TestCase):
+    def test_invalid_timeout(self):
+        for value in [0, -1, float('nan'), float('inf'), True, '5']:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                HTTP(timeout=value)
+
+    def test_invalid_path_type(self):
+        with self.assertRaises(ValueError):
+            HTTP().request('GET', None)
+
+class WDARecoveryTests(unittest.TestCase):
+    def test_capture_preserves_primary_error_when_restore_fails(self):
+        class API(FakeAPI):
+            def request(self, method, path, body=None):
+                if path.endswith('/screenshot'):
+                    raise WDAError('primary screenshot failure')
+                if method == 'POST' and path.endswith('/appium/settings') and body['settings']['screenshotQuality'] == 3:
+                    raise WDAError('restore failure')
+                return super().request(method, path, body)
+        phone = Phone(api=API()).attach()
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(WDAError, 'primary screenshot failure') as caught:
+                phone.capture(Path(tmp))
+        self.assertIn('restore failure', str(caught.exception.__notes__))
+
+class WDADeadlineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_invalid_deadline_does_not_send_requests(self):
+        api = FakeAPI()
+        output = WDAOutput(Config(), api=api)
+        for deadline in [float('nan'), float('inf'), True, 'now']:
+            with self.assertRaises(ValueError):
+                await output.perform('next', valid_until=deadline)
+        self.assertEqual(api.calls, [])
+
+    async def test_cancel_prepare_stops_followup_requests(self):
+        import threading
+        import asyncio
+        started, release = threading.Event(), threading.Event()
+        class API(FakeAPI):
+            def request(self, method, path, body=None):
+                if path == '/status':
+                    started.set()
+                    if not release.wait(2):
+                        raise RuntimeError('test timed out')
+                return super().request(method, path, body)
+        api = API()
+        output = WDAOutput(Config(), api=api)
+        task = asyncio.create_task(output.prepare())
+        try:
+            self.assertTrue(await asyncio.to_thread(started.wait, 1))
+            task.cancel()
+            await asyncio.sleep(0)
+        finally:
+            release.set()
+        with self.assertRaises(asyncio.CancelledError):
+            await task
+        self.assertIsNone(output.phone.sid)
+        self.assertEqual([path for _, path, _ in api.calls], ['/status'])
+        self.assertFalse(output.lock.locked())

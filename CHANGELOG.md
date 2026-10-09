@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Finalize IMU datasets only after successful capture; retain interrupted samples as private `.partial` files.
+- Preserve capture errors and cancellation reports when connection cleanup fails.
+- Validate WDA timeouts and input deadlines; handle truncated HTTP responses without replaying actions.
+- Stop follow-up WDA initialization requests after cancellation and retain startup failure reports.
+- Preserve screenshot errors when restoring screenshot settings fails.
+
 ## 1.1.0
 
 - Add USB WDA next/previous control and an interactive phone console.

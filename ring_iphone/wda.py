@@ -5,7 +5,9 @@ import base64
 import asyncio
 from datetime import datetime, timezone
 import json
+import http.client
 import math
+import os
 from pathlib import Path
 import re
 import time
@@ -36,13 +38,15 @@ class HTTP:
     def __init__(self, port=18100, *, opener=None, timeout=45):
         if type(port) is not int or not 1024 <= port <= 65535:
             raise ValueError("WDA 端口必须为 1024～65535")
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("WDA 超时必须为正有限数值")
         self.base = f"http://127.0.0.1:{port}"
         self.timeout = timeout
         # Local requests must not be sent through user/system HTTP proxies.
         self.opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
 
     def request(self, method, path, body=None):
-        if method not in {"GET", "POST"} or not path.startswith("/") or ".." in path or "://" in path:
+        if method not in {"GET", "POST"} or not isinstance(path, str) or not path.startswith("/") or ".." in path or "://" in path:
             raise ValueError("无效的 WDA 请求")
         encoded = None if body is None else json.dumps(body, allow_nan=False).encode()
         request = urllib.request.Request(self.base + path, data=encoded, method=method,
@@ -55,7 +59,7 @@ class HTTP:
             result = json.loads(data)
             if not isinstance(result, dict) or "value" not in result:
                 raise ValueError("WDA 响应格式无效")
-        except (OSError, ValueError, urllib.error.URLError) as exc:
+        except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as exc:
             error = WDAOutcomeUnknown if method == "POST" else WDAError
             raise error("WDA 请求未能确认结果；不会自动重试。保持 USB 转发和 Xcode 测试运行。") from exc
         value = result["value"]
@@ -124,6 +128,7 @@ class Phone:
         if not isinstance(settings, dict) or type(settings.get("screenshotQuality")) is not int:
             raise WDAError("无法取得截图设置；不改变现有设置")
         quality = settings["screenshotQuality"]
+        failure = None
         try:
             self.session("POST", "/appium/settings", {"settings": {"screenshotQuality": 0}})
             self.require_app()
@@ -139,11 +144,18 @@ class Phone:
             self.require_app()
             for name, data in (("screen.png", image), ("source.xml", source.encode())):
                 path = directory / name
-                with path.open("xb") as stream:
-                    path.chmod(0o600)
+                with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
                     stream.write(data)
+        except BaseException as exc:
+            failure = exc
+            raise
         finally:
-            self.session("POST", "/appium/settings", {"settings": {"screenshotQuality": quality}})
+            try:
+                self.session("POST", "/appium/settings", {"settings": {"screenshotQuality": quality}})
+            except Exception as exc:
+                if failure is None:
+                    raise
+                failure.add_note(f"Screenshot settings restoration failed: {exc}")
 
 
 def phone_command(args):
@@ -157,15 +169,18 @@ def phone_command(args):
         if args.dry_run or (not args.enable_output and action != "inspect"):
             print(json.dumps({"action": action, "mode": "dry-run", "phone_actions_sent": 0}))
             return
-        if phone is None:
-            phone = Phone(api=HTTP(args.port)).attach()
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         directory = args.state_dir / "wda" / stamp
         report = {"action": action, "iphone_mirroring": False, "status": "started"}
-        first_mutation = len(phone.mutations)
+        first_mutation = len(phone.mutations) if phone else 0
         action_completed = False
         write_json(directory / "report.json", report)
         try:
+            if phone is None:
+                phone = Phone(api=HTTP(args.port))
+                phone.attach()
+            elif not phone.sid:
+                phone.attach()
             if args.capture and action != "inspect":
                 phone.capture(directory / "before")
             if action == "inspect":
@@ -179,14 +194,14 @@ def phone_command(args):
         except BaseException as exc:
             report.update(status="cancelled" if isinstance(exc, KeyboardInterrupt) else "action_accepted_capture_failed" if action_completed else "failed",
                           phone_action_accepted=action_completed, error=f"{type(exc).__name__}: {exc}", retry_safe=False)
-            if args.capture and not isinstance(exc, KeyboardInterrupt):
+            if args.capture and phone is not None and phone.sid and not isinstance(exc, KeyboardInterrupt):
                 try:
                     phone.capture(directory / "diagnostic")
                 except Exception:
                     pass
             raise
         finally:
-            report["mutations"] = list(phone.mutations[first_mutation:])
+            report["mutations"] = list(phone.mutations[first_mutation:]) if phone else []
             write_json(directory / "report.json", report)
             print(json.dumps(report, ensure_ascii=False, indent=2))
             print(f"本地报告：{directory}")
@@ -219,10 +234,33 @@ class WDAOutput:
         self.last_attempt = None
 
     async def prepare(self):
-        await asyncio.to_thread(self.phone.attach)
+        async with self.lock:
+            revoked = threading.Event()
+            parent = self
+            class PrepareAPI:
+                def request(self, method, path, body=None):
+                    if revoked.is_set():
+                        raise WDAError('WDA 初始化已取消')
+                    return parent.api.request(method, path, body)
+            def worker():
+                phone = Phone(api=PrepareAPI()).attach()
+                if not revoked.is_set():
+                    parent.phone.sid = phone.sid
+            task = asyncio.create_task(asyncio.to_thread(worker))
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                revoked.set()
+                try:
+                    await asyncio.shield(task)
+                except Exception:
+                    pass
+                raise
 
     async def perform(self, action, *, guard=None, valid_until=None):
         from .mirroring import MirrorOutputInterrupted
+        if valid_until is not None and (isinstance(valid_until, bool) or not isinstance(valid_until, (int, float)) or not math.isfinite(valid_until)):
+            raise ValueError('无效的 WDA 输入截止时间')
         if action not in {'next', 'previous'}:
             raise ValueError('WDA 桥接仅支持 next/previous')
         if self.lock.locked():
