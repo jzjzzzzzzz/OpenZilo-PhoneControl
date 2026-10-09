@@ -28,8 +28,21 @@ class Config:
     rnn_margin: float = 0.12
     rnn_confirmations: int = 2
     rnn_idle_confidence: float = 0.8
+    output_backend: str = "switch-control"
+    mirror_scroll_pixels: int = 600
+    mirror_scroll_duration_s: float = 0.35
+    mirror_invert_scroll: bool = False
+    wda_port: int = 18100
 
     def validate(self) -> "Config":
+        if not isinstance(self.output_backend, str) or self.output_backend not in {"switch-control", "mirroring", "wda"}:
+            raise ValueError("output_backend 必须为 switch-control、mirroring 或 wda")
+        if type(self.wda_port) is not int or not 1024 <= self.wda_port <= 65535:
+            raise ValueError("wda_port 必须为 1024～65535")
+        if type(self.mirror_scroll_pixels) is not int or not 120 <= self.mirror_scroll_pixels <= 1200:
+            raise ValueError("mirror_scroll_pixels 必须为 120～1200 的整数")
+        if type(self.mirror_invert_scroll) is not bool:
+            raise ValueError("mirror_invert_scroll 必须为布尔值")
         if not isinstance(self.mapping, dict) or not self.mapping:
             raise ValueError("mapping 必须是非空对象")
         for event, action in self.mapping.items():
@@ -43,7 +56,7 @@ class Config:
                 raise ValueError(f"无效按键 {key!r}；仅支持 SPACE、F13～F20")
             if key is not None:
                 enabled.append(key)
-        if not enabled or len(set(enabled)) != len(enabled):
+        if (not enabled and self.output_backend == "switch-control") or len(set(enabled)) != len(enabled):
             raise ValueError("至少启用一个按键，且 next/previous 不能使用相同按键")
         limits = {
             "cooldown_s": (0.2, 10), "max_event_age_s": (0.05, 2),
@@ -52,6 +65,7 @@ class Config:
             "heartbeat_s": (5, 120), "key_hold_s": (0.02, 0.5),
             "rnn_confidence": (0.5, 1), "rnn_margin": (0, 1),
             "rnn_idle_confidence": (0.5, 1),
+            "mirror_scroll_duration_s": (0.1, 1.0),
         }
         for name, (low, high) in limits.items():
             value = getattr(self, name)

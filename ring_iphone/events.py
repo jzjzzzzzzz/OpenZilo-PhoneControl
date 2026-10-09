@@ -43,10 +43,12 @@ class EventGate:
     def __init__(self, config: Config):
         self.config = config
         self.paused = False
+        self.generation = 0
         self.reset(0.0)
 
     def reset(self, now: float) -> None:
         """New verified BLE session; events from the old session are discarded."""
+        self.generation += 1
         self.ready_at = now + self.config.settle_s
         self.last_emit_at = -math.inf
         self.seen: set[tuple[str, int]] = set()
@@ -54,9 +56,11 @@ class EventGate:
         # reset deliberately preserves pause state across a reconnect.
 
     def pause(self) -> None:
+        self.generation += 1
         self.paused = True
 
     def resume(self, now: float) -> None:
+        self.generation += 1
         self.paused = False
         self.ready_at = now + self.config.settle_s
 
@@ -79,9 +83,9 @@ class EventGate:
         if action is None:
             return Decision("unmapped")
         key = self.config.keys[action]
-        if key is None:
+        if key is None and self.config.output_backend == "switch-control":
             return Decision("action-disabled", action)
         if now - self.last_emit_at < self.config.cooldown_s:
             return Decision("cooldown", action)
         self.last_emit_at = now
-        return Decision("accepted", action, key)
+        return Decision("accepted", action, key if self.config.output_backend == "switch-control" else None)

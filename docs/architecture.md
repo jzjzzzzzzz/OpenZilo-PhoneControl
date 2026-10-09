@@ -4,33 +4,40 @@
 
 | Module | Responsibility |
 | --- | --- |
-| `sdk.py` | Load the pinned public OpenZilo SDK; no private sibling folder |
-| `ble.py` | BLE discovery, verified sessions, bounded protocol routing and optional IMU reporting |
-| `events.py` | Discrete-event interpretation and common command gate |
-| `models.py` | Local model import, compatibility checks, Motion Lab adapter and prediction gate |
-| `output.py` | macOS Quartz key-down/key-up output; no iPhone delivery acknowledgement |
-| `bridge.py` | Session lifecycle, source selection, pause/resume, heartbeat and cleanup |
-| `storage.py` | Private local files, atomic JSON writes and instance locks |
-| `cli.py` | User-facing commands and explicit output enablement |
+| `ble.py` | Verified NUS transport, bounded queues and IMU reporting |
+| `collect.py` | Labeled local ring-imu/v1 capture |
+| `models.py` | NPZ import, runtime validation, windows and recognition gate |
+| `events.py` | Discrete-event mapping, freshness, duplicate suppression and cooldown |
+| `wda.py` | Douyin application checks, native swipes and async bridge adapter |
+| `storage.py` | Private local files, atomic status and instance locks |
+| `cli.py` | Collection, model commands, direct phone control and bridge lifecycle |
 
-## Default event path
+## Input and inference
 
-The adapter verifies the physical CPUID before enabling event delivery. Firmware events are discrete observations, not RNN predictions. Single-press events are never user-mappable because firmware reserves them for mode switching.
+BLE sessions verify the ring's physical identity before accepting input.
+Firmware events and IMU-model input are separate sources. For RNN input, six raw
+channels are normalized by 32768, resampled according to the model contract and
+classified locally. Idle re-arms the recognition gate; repeated confident
+predictions produce `next` or `previous` actions.
 
-Only system-information requests are sent during an event-mode session. Unexpected audio and IMU traffic is discarded rather than stored. No audio deletion, firmware flashing, clock modification or shipping-mode commands are available through this adapter.
+## Phone output
 
-## Optional RNN path
+The WDA backend uses the existing USB forwarder on `127.0.0.1:18100`. It verifies
+WDA readiness and the Douyin bundle before submitting a native swipe. Network
+requests run outside the BLE event loop. Pause/session changes revoke requests
+that have not reached WDA; submitted requests are not automatically replayed.
 
-An imported model is loaded before connecting to hardware. After identity verification, the adapter starts IMU reporting and checks the actual sample rate and sensor ranges. Recognition and event paths are mutually exclusive for command output. Model evaluation runs off the asyncio loop; results are discarded if they arrive after pause, reset, disconnect or the freshness deadline.
+Direct `phone` commands use the same WDA client without connecting the ring.
+Local status separates accepted API requests from observed phone outcomes.
+The keyboard and Mirroring adapters remain available as alternative Mac outputs.
 
-The command gate operates after prediction confirmation and idle re-arming. Device timestamps are used for stream continuity; they are never compared directly to the host monotonic clock. Sensor reporting is stopped on clean shutdown when possible; BLE disconnection also terminates the firmware's reporting session.
+## Data and model locations
 
-## Output and system boundary
+- `captures/`: user recording sessions and sensor reports.
+- `models/`: imported personal exports and runtime manifests.
+- `state/`: device binding, status and private phone diagnostics.
+- `vendor/`: locally obtained WDA source, builds and signing-related project data.
+- `demo/`: the published synthetic model, sample windows and inference results.
 
-Quartz posts a single Mac key press. Apple Switch Control must already capture that key and route it to an iPhone recipe. The application cannot verify the active phone app or observe the result of the gesture. Status therefore always distinguishes local key submission from unverified phone delivery.
-
-The default is one `SPACE` switch and one next-video action. Multiple keys on the Mac do not establish multiple independent iPhone switches. Two-way navigation requires a separate phone-side acceptance test.
-
-## Storage boundary
-
-`state/` contains bindings, current state and rotated logs. `models/` contains imported weights and manifests. Both are local-only; only `models/README.md` is published. The application does not upload telemetry or models.
+The publication snapshot is selected by an exact allowlist rather than copying
+these local directories.

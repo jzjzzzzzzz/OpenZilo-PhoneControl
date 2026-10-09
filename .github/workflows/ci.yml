@@ -44,4 +44,7 @@ jobs:
       - name: Offline replay and shell syntax
         run: |
           ./ringphone replay
+          ./ringphone simulate --event up --backend mirroring --dry-run
+          ./ringphone phone next --dry-run
+          python scripts/demo_imu.py --lab .motion-lab --output results/imu-demo.json
           /bin/sh -n ringphone setup.sh

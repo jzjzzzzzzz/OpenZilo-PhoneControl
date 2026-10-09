@@ -1,50 +1,37 @@
-# Public release boundary
+# Publication boundary
 
-This repository publishes the PhoneControl application, not its surrounding development workspace or private device materials.
+The public snapshot contains application source, operational guides, tests and
+one named synthetic IMU example.
 
-## Included
+## Included assets
 
-- Application source and command-line launchers.
-- Public dependency declarations with a reviewed OpenZilo SDK commit.
-- Formal English and Simplified Chinese READMEs and operational documentation.
-- Example configurations and a small synthetic event replay.
-- Automated tests that generate temporary synthetic model parameters.
-- CI configuration, repository metadata and the release audit script.
+- Public OpenZilo dependency, pinned to a reviewed commit.
+- BLE collection, model import/inference and phone-control source.
+- WDA USB forwarding, next/previous commands and console.
+- `demo/imu-baseline.npz`, its model card, generated inputs and exported predictions.
+- Reproducible example generation and a pinned Motion Lab training entry point.
+- CI and a SHA-256 publication inventory.
 
-## Excluded
+## Local files
 
-- Actual RNN weights, model manifests and training checkpoints.
-- Training datasets, raw IMU/voice captures and derived private results.
-- Device bindings, CPUIDs, serial numbers, CoreBluetooth addresses and runtime logs.
-- Private SDKs, firmware, hardware design files and historical workspaces.
-- Virtual environments, credentials, build outputs and Git history from other projects.
+`captures/`, `state/`, `results/`, `vendor/` and personal `models/` exports remain
+local. They hold sensor recordings, device identities, logs, phone screenshots,
+WDA builds, signing materials and personal model weights. The only binary model
+in the allowlist is `demo/imu-baseline.npz`, trained on synthetic data.
 
-The only published file under `models/` is its README. Training remains in [ComBodied Motion Lab](https://github.com/jzjzzzzzzz/combodied-motion-lab); local import is documented in [Model integration](docs/models.md).
-
-## Review and export
-
-The exact allowlist lives in `scripts/check_release.py`. The audit verifies UTF-8 text, file-size bounds, common credential/device-address patterns and absence of symlinks. It is a guardrail in addition to human review, not a universal secret detector.
-
-After reviewing intentional source changes:
+## Audit and export
 
 ```bash
 .venv/bin/python scripts/check_release.py --write-manifest
 .venv/bin/python scripts/check_release.py
-.venv/bin/python scripts/check_release.py --export /path/to/new-clean-export
+.venv/bin/python scripts/check_release.py --export /path/to/new-public-export
 ```
 
-`release-files.sha256` covers every allowlisted file except itself. Exports create a **new** directory and do not copy runtime state, model artifacts or an existing `.git` directory.
+The auditor checks exact paths, symlinks, text metadata, common credential/device
+identifier patterns and checksums. The demo NPZ additionally has bounded archive
+size, finite numeric arrays, no object/pickle arrays and synthetic-only provenance.
+`release-files.sha256` covers every published file except itself.
 
-Before a commit, stage only reviewed files. Then run:
-
-```bash
-.venv/bin/python scripts/check_release.py --tracked
-```
-
-This additionally rejects unexpected Git-tracked paths, nonregular file modes, missing files and differences between the audited working tree and staged content. `.gitignore` alone cannot protect a force-added file; CI performs the tracked-file audit as well. The audit covers the current snapshot, not previous Git history.
-
-## Repository metadata
-
-The intended repository is `jzjzzzzzzz/OpenZilo-PhoneControl`, public, with Topics including `combodied-ai` and `openzilo`. Desired metadata is recorded in `.github/repository.json`; GitHub Topics are configured separately in repository settings.
-
-No model assets are attached to GitHub releases. A project-wide application license has not yet been selected; public visibility does not replace license selection.
+After staging the exact reviewed set, `--tracked` also verifies Git index content
+and modes. Repository: `jzjzzzzzzz/OpenZilo-PhoneControl`; topics include
+`combodied-ai` and `openzilo`.

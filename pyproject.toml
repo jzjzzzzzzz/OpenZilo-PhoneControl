@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OpenZilo-PhoneControl"
-version = "1.0.0"
-description = "Local wearable-to-iPhone interaction through macOS Switch Control for ComBodied AI."
+version = "1.1.0"
+description = "Ring IMU collection, local gesture inference and USB iPhone control for ComBodied AI."
 readme = "README.md"
 requires-python = ">=3.11"
 keywords = ["combodied-ai", "openzilo", "gesture-recognition", "iphone", "accessibility"]
 dependencies = [
   "bleak>=3.0,<4",
+  "pyobjc-framework-Cocoa>=10,<13; sys_platform == 'darwin'",
   "OpenZilo @ git+https://github.com/ziloai/OpenZilo.git@e9a861dd5c82a154fba0f1bafb628cd04fbd9555",
 ]
 

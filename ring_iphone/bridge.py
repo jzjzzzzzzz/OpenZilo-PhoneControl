@@ -16,7 +16,15 @@ from .storage import read_profile, utc_now, write_json
 async def run_bridge(config, state, logger, *, enable_output=False, monitor=False, duration=None,
                      connector=connect_profile, keyboard=None, artifact=None):
     profile = read_profile(state / "ring-profile.json")
-    output = keyboard or (MacKeyboard(config.key_hold_s) if enable_output else DryKeyboard())
+    if config.output_backend == "wda":
+        from .wda import WDAOutput
+        from .mirroring import DryMirroring
+        output = keyboard or (WDAOutput(config) if enable_output else DryMirroring())
+    elif config.output_backend == "mirroring":
+        from .mirroring import MacMirroring, DryMirroring
+        output = keyboard or (MacMirroring(config) if enable_output else DryMirroring())
+    else:
+        output = keyboard or (MacKeyboard(config.key_hold_s) if enable_output else DryKeyboard())
     if enable_output and not output.trusted:
         raise PermissionError("缺少 macOS 辅助功能权限；运行 ./ringphone doctor 查看状态")
     gate = EventGate(config)
@@ -31,6 +39,8 @@ async def run_bridge(config, state, logger, *, enable_output=False, monitor=Fals
         "posted_keys": 0, "simulated_keys": 0, "last_event": None, "last_output": None,
         "iphone_delivery": "unverified", "mapping": config.mapping, "keys": config.keys,
         "source": "rnn" if artifact else "events",
+        "output_backend": config.output_backend, "posted_swipes": 0, "simulated_swipes": 0,
+        "partial_swipes": 0, "last_output_attempt": None,
     }
     path = state / "status.json"
 
@@ -70,15 +80,35 @@ async def run_bridge(config, state, logger, *, enable_output=False, monitor=Fals
         update(last_event={**asdict(event), **asdict(decision)}, transport=link.stats.copy())
         if monitor:
             logger.info("事件 %s t=%d（仅监控）", event.name, event.timestamp_ms)
-        elif decision.key:
+        elif decision.reason == "accepted":
             # Output failures propagate and stop the bridge. Never retry a phone action.
-            await output.press(decision.key)
-            field = "posted_keys" if enable_output else "simulated_keys"
+            mirrored = config.output_backend in {"mirroring", "wda"}
+            if mirrored:
+                from .mirroring import MirrorOutputInterrupted
+                generation = gate.generation
+                try:
+                    await output.perform(decision.action,
+                        guard=lambda: not gate.paused and gate.generation == generation and not link.disconnected.is_set(),
+                        valid_until=event.received_at + config.max_event_age_s)
+                except MirrorOutputInterrupted as exc:
+                    logger.info("丢弃已撤销的镜像动作：%s", exc)
+                    return
+                finally:
+                    attempt = getattr(output, "last_attempt", None)
+                    if attempt is not None:
+                        if attempt["attempted_scroll_events"] and not attempt["completed"]:
+                            status["partial_swipes"] += 1
+                        update(last_output_attempt={"at": utc_now(), **attempt})
+            else:
+                await output.press(decision.key)
+            field = ("posted_swipes" if enable_output else "simulated_swipes") if mirrored else ("posted_keys" if enable_output else "simulated_keys")
             status[field] += 1
             update(last_output={"at": utc_now(), "event": event.name, "action": decision.action,
-                                "key": decision.key, "kind": "posted" if enable_output else "simulated"})
+                                "key": decision.key, "backend": config.output_backend,
+                                "kind": "posted" if enable_output else "simulated"})
             logger.info("%s %s → %s → %s（手机端执行未确认）",
-                        "POST" if enable_output else "DRY", event.name, decision.action, decision.key)
+                        "POST" if enable_output else "DRY", event.name, decision.action,
+                        config.output_backend if mirrored else decision.key)
         else:
             logger.info("忽略 %s：%s", event.name, decision.reason)
 
@@ -191,7 +221,11 @@ async def run_bridge(config, state, logger, *, enable_output=False, monitor=Fals
             installed_signals.append((number, previous_handler))
         logger.info("%s；p+回车暂停，r+回车恢复，q+回车或 Ctrl-C 退出",
                     "真实按键输出已启用" if enable_output else "仅监控" if monitor else "DRY-RUN，不发送按键")
-        worker = asyncio.create_task(connect_loop())
+        async def start_worker():
+            if config.output_backend == 'wda' and enable_output and not monitor:
+                await output.prepare()
+            await connect_loop()
+        worker = asyncio.create_task(start_worker())
         stopper = asyncio.create_task(stop.wait())
         tasks = [worker, stopper]
         if duration is not None:

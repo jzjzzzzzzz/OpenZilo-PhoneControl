@@ -1,6 +1,15 @@
 {
   "name": "OpenZilo-PhoneControl",
   "visibility": "public",
-  "description": "Local OpenZilo ring-to-iPhone interaction through macOS Switch Control, with optional Motion Lab RNN imports for ComBodied AI.",
-  "topics": ["combodied-ai", "openzilo", "iphone", "macos", "switch-control", "wearable", "gesture-recognition", "python"]
+  "description": "Ring IMU collection, model export/import and local iPhone control for ComBodied AI.",
+  "topics": [
+    "combodied-ai",
+    "openzilo",
+    "iphone",
+    "macos",
+    "switch-control",
+    "wearable",
+    "gesture-recognition",
+    "python"
+  ]
 }

@@ -1,0 +1,41 @@
+{
+  "schema": "phonecontrol/demo-inference-v1",
+  "data_source": "synthetic_imu_only",
+  "model_import_verified": true,
+  "phone_actions_sent": 0,
+  "predictions": [
+    {
+      "input_label": "down",
+      "frames": 160,
+      "predicted": "down",
+      "probabilities": {
+        "down": 0.9994778651278949,
+        "idle": 0.0002619797956116416,
+        "up": 0.0002601550764934106
+      },
+      "mapped_action": "previous"
+    },
+    {
+      "input_label": "idle",
+      "frames": 160,
+      "predicted": "idle",
+      "probabilities": {
+        "down": 8.360761672905055e-05,
+        "idle": 0.9999107270354575,
+        "up": 5.665347813401383e-06
+      },
+      "mapped_action": null
+    },
+    {
+      "input_label": "up",
+      "frames": 160,
+      "predicted": "up",
+      "probabilities": {
+        "down": 0.00017594774248095872,
+        "idle": 9.737985959910483e-05,
+        "up": 0.9997266723979198
+      },
+      "mapped_action": "next"
+    }
+  ]
+}

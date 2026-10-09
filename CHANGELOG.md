@@ -1,13 +1,15 @@
 # Changelog
 
-## 1.0.0 — Initial public snapshot
+## 1.1.0
 
-- Introduce OpenZilo-PhoneControl, a local ring-to-iPhone bridge through macOS Switch Control.
-- Support verified BLE sessions, firmware button/gesture input, controlled key output and dry-run replay.
-- Use the public OpenZilo SDK at a reviewed pinned revision.
-- Add local Motion Lab NPZ import, artifact validation and optional continuous RNN inference.
-- Separate training documentation and runtime sources from the application; distribute no trained model weights.
-- Document iPhone setup, manual acceptance requirements, model preprocessing and publication boundaries.
-- Add synthetic tests, public CI and an exact release-file allowlist with checksums.
+- Add USB WDA next/previous control and an interactive phone console.
+- Connect model-driven ring actions to the asynchronous WDA output adapter.
+- Add labeled ring-imu/v1 collection and a pinned v3 personal-training entry point.
+- Publish the minimal synthetic GRU example, model card, input windows and exported predictions.
+- Add export/import, native event-object and IMU-to-WDA integration tests.
+- Update English/Chinese quick starts and exact publication auditing for the example model.
 
-Phone-side execution and model recognition quality require independent physical/data evaluation; this initial snapshot does not claim completed end-to-end hardware acceptance.
+## 1.0.0
+
+- Introduce verified OpenZilo BLE sessions, firmware event gates and local model import.
+- Add macOS output adapters, replay, diagnostics, CI and the publication inventory.

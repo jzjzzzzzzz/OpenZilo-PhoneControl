@@ -8,6 +8,7 @@
 /models/*
 !/models/README.md
 *.npz
+!/demo/imu-baseline.npz
 *.npy
 *.pt
 *.pth

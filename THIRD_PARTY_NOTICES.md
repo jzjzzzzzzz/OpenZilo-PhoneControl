@@ -9,6 +9,13 @@ No upstream source code, model weights, firmware, logos or hardware assets are v
 | NumPy | Optional model arrays and numerical inference | [BSD-3-Clause and bundled notices](https://github.com/numpy/numpy/blob/main/LICENSE.txt) |
 | ComBodied Motion Lab | Separately obtained training system and optional inference runtime | [Repository](https://github.com/jzjzzzzzzz/combodied-motion-lab); no project-wide license identified in reviewed revision `839ecc0bc89fd560e29eb6cc1b41f17afe5a51d7`; obtain separately and review its terms |
 | Apple Switch Control | Operating-system accessibility mechanism | [Apple platform documentation](https://support.apple.com/en-us/118667) |
+| PyObjC Cocoa | macOS application/window focus metadata and Foundation run-loop integration | [MIT](https://github.com/ronaldoussoren/pyobjc/blob/master/LICENSE.txt) |
+
+The independently written Mirroring backend references public implementations
+in [iphone-mcp](https://github.com/yev-yev-yev/iphone-mcp) (MIT) and
+[iphoneclaw](https://github.com/NoEdgeAI/iphoneclaw) (Apache-2.0). Their source is
+not vendored or executed. Reviewed revisions and implementation differences are
+recorded in [the Mirroring guide](docs/mirroring.md).
 
 Installed distributions may contain additional transitive dependencies and notices. Their terms remain with their respective distributions. Model owners control the terms of their imported weights and datasets.
 

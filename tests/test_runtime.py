@@ -106,6 +106,56 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(status["mode"], "monitor")
         self.assertEqual(status["last_event"]["name"], "key_double_press")
 
+    async def test_mirroring_dry_bridge_counts_swipes_not_keys(self):
+        self.config.output_backend = "mirroring"
+        status = await run_bridge(self.config, self.state, quiet_logger(), duration=0.07,
+                                  connector=self.connect)
+        self.assertEqual(status["simulated_swipes"], 1)
+        self.assertEqual(status["simulated_keys"], 0)
+        self.assertEqual(status["posted_swipes"], 0)
+        self.assertEqual(status["iphone_delivery"], "unverified")
+
+    async def test_pausing_during_swipe_keeps_bridge_paused_and_records_partial(self):
+        from ring_iphone.events import EventGate
+        from ring_iphone.mirroring import MirrorOutputInterrupted
+        self.config.output_backend = "mirroring"
+        gate = EventGate(self.config)
+        class PausingOutput:
+            trusted = True
+            last_attempt = None
+            async def perform(output, action, *, guard, valid_until):
+                self.assertTrue(guard())
+                self.assertGreater(valid_until, time.monotonic())
+                gate.pause()
+                self.assertFalse(guard())
+                output.last_attempt = {"action": action, "attempted_scroll_events": 1,
+                                       "submitted_scroll_events": 1, "completed": False, "outcome": "unknown"}
+                raise MirrorOutputInterrupted("paused")
+        with patch("ring_iphone.bridge.EventGate", return_value=gate):
+            status = await run_bridge(self.config, self.state, quiet_logger(), duration=0.07,
+                                      connector=self.connect, keyboard=PausingOutput(), enable_output=True)
+        self.assertEqual(status["partial_swipes"], 1)
+        self.assertEqual(status["posted_swipes"], 0)
+        self.assertEqual(status["last_output_attempt"]["outcome"], "unknown")
+        self.assertEqual(len(self.links), 1)
+
+    async def test_fatal_partial_swipe_is_recorded_and_never_retried(self):
+        self.config.output_backend = "mirroring"
+        class BrokenMirror:
+            trusted = True
+            last_attempt = None
+            async def perform(output, action, **kwargs):
+                output.last_attempt = {"action": action, "attempted_scroll_events": 1,
+                                       "submitted_scroll_events": 1, "completed": False, "outcome": "unknown"}
+                raise RuntimeError("foreground changed")
+        with self.assertRaises(RuntimeError):
+            await run_bridge(self.config, self.state, quiet_logger(), duration=0.2,
+                             connector=self.connect, keyboard=BrokenMirror(), enable_output=True)
+        status = json.loads((self.state / "status.json").read_text())
+        self.assertEqual(status["partial_swipes"], 1)
+        self.assertEqual(status["posted_swipes"], 0)
+        self.assertEqual(len(self.links), 1)
+
     async def test_output_failure_is_fatal_not_replayed(self):
         class BrokenOutput:
             trusted = True

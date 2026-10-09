@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
+import json
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = "release-files.sha256"
@@ -30,9 +33,17 @@ ringphone
 setup.sh
 docs/architecture.md
 docs/models.md
-docs/setup-iphone.zh-CN.md
+docs/mirroring.md
 docs/testing.md
 docs/troubleshooting.md
+docs/wda.md
+docs/validation.md
+docs/quickstart.zh-CN.md
+demo/README.md
+demo/imu-baseline.npz
+demo/model-card.json
+demo/imu-windows.json
+demo/predictions.json
 examples/button.json
 examples/events.jsonl
 examples/gesture.json
@@ -45,22 +56,36 @@ ring_iphone/ble.py
 ring_iphone/bridge.py
 ring_iphone/cli.py
 ring_iphone/config.py
+ring_iphone/collect.py
 ring_iphone/events.py
 ring_iphone/models.py
+ring_iphone/mirroring.py
 ring_iphone/output.py
 ring_iphone/sdk.py
 ring_iphone/storage.py
+ring_iphone/wda.py
 scripts/check_release.py
+scripts/wda_usb.py
+scripts/train_demo_model.py
+scripts/train_ring_model.py
+scripts/demo_imu.py
+scripts/publish.sh
 tests/fakes.py
 tests/test_ble.py
 tests/test_core.py
 tests/test_models.py
+tests/test_mirroring.py
 tests/test_pairing.py
 tests/test_release.py
 tests/test_rnn_runtime.py
 tests/test_runtime.py
+tests/test_wda_usb.py
+tests/test_wda.py
+tests/test_demo.py
+tests/test_collect.py
 """.split())
-EXECUTABLES = {"ringphone", "setup.sh"}
+EXECUTABLES = {"ringphone", "setup.sh", "scripts/publish.sh"}
+BINARY_FILES = {"demo/imu-baseline.npz"}
 FORBIDDEN = (
     ("personal absolute path", re.compile(r"/(?:Users|home)/[A-Za-z0-9_.-]+")),
     ("private key", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
@@ -92,9 +117,42 @@ def read_public(root: Path):
         if not path.is_file():
             raise ValueError(f"Missing reviewed file: {name}")
         data = path.read_bytes()
-        audit_text(name, data)
+        if name in BINARY_FILES:
+            audit_demo_model(root, data)
+        else:
+            audit_text(name, data)
         result[name] = data
     return result
+
+
+def audit_demo_model(root: Path, data: bytes):
+    import numpy as np
+    card_path = root / 'demo/model-card.json'
+    if card_path.is_symlink():
+        raise ValueError('Demo model card must not be a symlink')
+    card = json.loads(card_path.read_text())
+    if len(data) > 65536 or hashlib.sha256(data).hexdigest() != card.get('model_sha256'):
+        raise ValueError('Demo model bytes/hash do not match its reviewed card')
+    if card.get('data_source') != 'synthetic_imu_only':
+        raise ValueError('Only the synthetic example may be published')
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        entries = archive.infolist()
+        if len(entries) > 40 or len({entry.filename for entry in entries}) != len(entries) or sum(entry.file_size for entry in entries) > 262144:
+            raise ValueError('Demo archive exceeds limits')
+    with np.load(io.BytesIO(data), allow_pickle=False) as arrays:
+        for key in arrays.files:
+            value = arrays[key]
+            if value.dtype.hasobject:
+                raise ValueError('Object arrays are not allowed')
+            if np.issubdtype(value.dtype, np.number) and not np.isfinite(value).all():
+                raise ValueError('Demo parameters must be finite')
+            if value.dtype.kind in 'US':
+                audit_text('demo model string metadata', str(value.tolist()).encode())
+        metadata = json.loads(str(arrays['metadata']))
+        if metadata.get('demo_only') is not True or metadata.get('training_data_source') != 'synthetic_imu_only':
+            raise ValueError('Demo provenance is required')
+        if str(arrays['model_type']) != 'ring-rnn-v1' or arrays['classes'].tolist() != ['down', 'idle', 'up']:
+            raise ValueError('Unexpected demo model contract')
 
 
 def inventory(files: dict[str, bytes]):
@@ -151,7 +209,7 @@ def main(argv=None):
         check_tracked(ROOT, files)
     if args.export:
         export_public(args.export, files)
-    print(f"Release audit passed: {len(files)} reviewed text files; no model artifacts or runtime state.")
+    print(f"Release audit passed: {len(files)} reviewed files; only the allowlisted synthetic demo model, no private state.")
     return 0
 
 

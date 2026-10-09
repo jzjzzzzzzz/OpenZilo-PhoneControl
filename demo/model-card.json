@@ -1,0 +1,29 @@
+{
+  "schema": "phonecontrol/demo-model-v1",
+  "data_source": "synthetic_imu_only",
+  "classes": [
+    "down",
+    "idle",
+    "up"
+  ],
+  "train_windows": 90,
+  "validation_windows": 30,
+  "test_windows": 30,
+  "epochs": 150,
+  "parameters": 1692,
+  "synthetic_test_accuracy": 1.0,
+  "torch_numpy_max_error": 1.018303432687162e-07,
+  "sensor_contract": {
+    "sample_rate_hz": 100,
+    "accel_range_g": 16,
+    "gyro_range_dps": 2000
+  },
+  "model_bytes": 12777,
+  "model_sha256": "c2cc874d6b0c8b545a526c88695772ff12ba878fa663cb03cd5b87c7317d55e5",
+  "training_script": "scripts/train_demo_model.py",
+  "python": "3.13.14",
+  "numpy": "2.5.1",
+  "torch": "2.13.0",
+  "seed": 20261009,
+  "usage": "Minimal import/export example. Collect and train your own ring data."
+}
